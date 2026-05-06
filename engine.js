@@ -149,13 +149,15 @@ class AkinatorEngine {
 
       switch (answer) {
         case "yes":
-          // Hard eliminate non-matching players
-          if (!matches) this.weights[player.id] = 0;
+          // Soft eliminate non-matching players (heavy penalty instead of 0)
+          if (!matches) this.weights[player.id] *= 0.05;
+          else this.weights[player.id] *= 2.0; // Reward matching players
           break;
 
         case "no":
-          // Hard eliminate matching players
-          if (matches) this.weights[player.id] = 0;
+          // Soft eliminate matching players
+          if (matches) this.weights[player.id] *= 0.05;
+          else this.weights[player.id] *= 2.0; // Reward non-matching players
           break;
 
         case "maybe":

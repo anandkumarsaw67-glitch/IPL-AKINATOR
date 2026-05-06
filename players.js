@@ -6,9 +6,9 @@ const PLAYERS = [
     battingPosition: "Top", teams: ["RCB"],
     isCaptain: true, isDeathBowler: false, isFinisher: false,
     isPowerplaySpecialist: true, isAggressive: true, isActive: true,
-    titles: 0, isWicketkeeper: false, isSpin: false, isFast: false,
+    titles: 1, isWicketkeeper: false, isSpin: false, isFast: false,
     isAllRounder: false, isLeftHanded: false, hasPlayedTest: true,
-    isOpener: false, isYoung: false, teamColor: "#EC1C24"
+    isOpener: true, isYoung: false, teamColor: "#EC1C24"
   },
   {
     id: "rohit_sharma", name: "Rohit Sharma", emoji: "🏆",

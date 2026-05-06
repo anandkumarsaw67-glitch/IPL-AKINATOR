@@ -253,8 +253,12 @@ function buildTags(player) {
   html += `<span class="tag tag-country">${player.country}</span>`;
   if (player.teams.length)
     html += `<span class="tag tag-team">${player.teams[player.teams.length - 1]}</span>`;
-  if (player.titles > 0)
+  
+  if (player.teams.includes("RCB")) {
+    html += `<span class="tag tag-title" style="background: rgba(244, 208, 63, 0.15); color: #F4D03F; border: 1px solid rgba(244, 208, 63, 0.5);">🏆 2025 Champions</span>`;
+  } else if (player.titles > 0) {
     html += `<span class="tag tag-title">🏆 ${player.titles} Title${player.titles > 1 ? 's' : ''}</span>`;
+  }
   if (player.isCaptain)
     html += `<span class="tag tag-role">Captain</span>`;
   return html;
