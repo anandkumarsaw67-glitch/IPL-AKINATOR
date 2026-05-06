@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IPL Akinator — Guess the Player</title>
+  <meta name="description" content="AI-powered Akinator that guesses any IPL cricket player using intelligent adaptive questioning. Think of a player and let the AI figure it out!" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app">
+  <!-- Top Navigation -->
+  <header class="top-nav">
+    <div class="nav-brand">🏏 IPL AKINATOR</div>
+    <div class="nav-lang">
+      <select id="lang-select" class="lang-select" aria-label="Language Select">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी</option>
+        <option value="ta">தமிழ்</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 1 — SPLASH
+  ══════════════════════════════════════════ -->
+  <section id="splash-screen" class="screen active" role="main">
+    <div class="splash-hero">
+      <div class="splash-glow"></div>
+      <img src="genie.png" alt="Akinator Genie" class="splash-image" />
+    </div>
+
+    <div>
+      <h1 class="splash-title">Ready to be amazed?</h1>
+      <p class="splash-subtitle">
+        Think of any <span>IPL cricket player</span>.<br/>
+        I'll read your mind using the power of AI. 🧠
+      </p>
+    </div>
+
+    <div class="splash-stats">
+      <div class="stat-pill"><strong>40+</strong> Players</div>
+      <div class="stat-pill"><strong>10</strong> Questions Max</div>
+      <div class="stat-pill"><strong>72%</strong> Confidence Threshold</div>
+    </div>
+
+
+    <button class="btn-primary" id="start-btn" aria-label="Start the game">
+      <span>🚀</span> Think of a Player
+    </button>
+
+    <p class="text-muted" id="offline-note">🤖 Powered by Gemini AI · Think of any IPL player ✨</p>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 2 — GAME (Questions)
+  ══════════════════════════════════════════ -->
+  <section id="game-screen" class="screen" aria-live="polite">
+
+    <div class="game-header">
+      <span class="game-brand">🏏 IPL AKINATOR</span>
+      <span class="question-counter" id="q-counter">Question <span id="q-num">1</span> / <span id="q-max">8</span></span>
+    </div>
+
+    <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="8">
+      <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+    </div>
+
+    <div class="candidates-bar" id="candidates-bar">
+      Narrowing from <span id="candidate-count">40</span> players…
+    </div>
+
+    <!-- AI & Question Layout -->
+    <div class="ai-question-wrap">
+      <div class="ai-avatar-col">
+        <img src="genie.png" alt="Akinator Genie" class="ai-avatar" id="ai-avatar" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'%3E%3Ctext y=\\'50%' x=\\'50%' font-size=\\'50\\' text-anchor=\\'middle\\' dy=\\'.3em\\'%3E🧞%3C/text%3E%3C/svg%3E'">
+      </div>
+      <div class="question-col">
+        <div class="ai-status-header" style="margin-bottom: 8px;">
+          <div class="ai-label">AI is thinking</div>
+          <div id="ai-status" style="font-size:13px; color: var(--text-muted); margin-top:2px;">Analyzing your player…</div>
+        </div>
+        <!-- Question Card -->
+        <div class="glass-card question-card" id="question-card">
+          <p class="question-text" id="question-text">
+            <span class="thinking-dots">
+              <span></span><span></span><span></span>
+            </span>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Answer Buttons -->
+    <div class="answers-grid">
+      <button class="answer-btn btn-yes"   id="btn-yes"   data-answer="yes"   aria-label="Yes">
+        <span class="btn-icon">✅</span> Yes
+      </button>
+      <button class="answer-btn btn-no"    id="btn-no"    data-answer="no"    aria-label="No">
+        <span class="btn-icon">❌</span> No
+      </button>
+      <button class="answer-btn btn-maybe" id="btn-maybe" data-answer="maybe" aria-label="Maybe or Partially">
+        <span class="btn-icon">🤔</span> Maybe
+      </button>
+      <button class="answer-btn btn-idk"   id="btn-idk"   data-answer="idk"   aria-label="Don't Know">
+        <span class="btn-icon">🤷</span> Don't Know
+      </button>
+    </div>
+
+    <button class="btn-secondary" id="restart-mid-btn" style="margin-top: 4px;">
+      ↩ Start Over
+    </button>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 3 — GUESS REVEAL
+  ══════════════════════════════════════════ -->
+  <section id="guess-screen" class="screen">
+    <p class="guess-label">🎯 I think you're thinking of…</p>
+
+    <div class="glass-card player-reveal-card" id="player-reveal-card">
+      <div class="player-emoji-wrap" id="player-emoji">🏏</div>
+      <h2 class="player-name"  id="guess-player-name">Player Name</h2>
+      <p class="player-meta"   id="guess-player-meta">Role · Country</p>
+
+      <div class="player-tags" id="guess-player-tags"></div>
+
+      <div class="confidence-bar-wrap">
+        <div class="confidence-label">
+          <span>AI Confidence</span>
+          <strong id="confidence-pct">0%</strong>
+        </div>
+        <div class="confidence-track">
+          <div class="confidence-fill" id="confidence-fill" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="guess-question">Am I right? 🤔</p>
+
+    <div class="guess-actions">
+      <button class="btn-primary"   id="correct-btn"   aria-label="Yes you got it right">🎉 Yes, correct!</button>
+      <button class="btn-secondary" id="incorrect-btn" aria-label="No that is wrong">❌ Nope, wrong!</button>
+    </div>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 4 — RESULT (Win/Lose)
+  ══════════════════════════════════════════ -->
+  <section id="result-screen" class="screen">
+    <div class="result-icon" id="result-icon">🎉</div>
+    <h2 class="result-title" id="result-title">Amazing!</h2>
+    <p class="result-subtitle" id="result-subtitle">The AI got it right!</p>
+
+    <button class="btn-primary" id="play-again-btn">🔄 Play Again</button>
+  </section>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 5 — CORRECTION (Wrong Guess)
+  ══════════════════════════════════════════ -->
+  <section id="correction-screen" class="screen">
+    <div class="glass-card">
+      <p class="correction-title">🤔 Who were you thinking of?</p>
+      <p class="text-muted" style="text-align:center; margin: 8px 0 20px;">
+        Help me learn! Select the correct player.
+      </p>
+
+      <div class="player-search-wrap">
+        <input
+          type="text"
+          id="player-search"
+          class="player-search"
+          placeholder="Type player name…"
+          autocomplete="off"
+          aria-label="Search for correct player"
+        />
+        <div class="player-dropdown" id="player-dropdown"></div>
+      </div>
+    </div>
+
+    <div class="guess-actions">
+      <button class="btn-primary"   id="submit-correction-btn" disabled>✅ Submit</button>
+      <button class="btn-secondary" id="skip-correction-btn">⏭ Skip</button>
+    </div>
+  </section>
+
+</div><!-- /#app -->
+
+<!-- Scripts -->
+<script src="config.js"></script>
+<script src="players.js"></script>
+<script src="questions.js"></script>
+<script src="engine.js"></script>
+<script src="gemini.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

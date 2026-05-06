@@ -1,0 +1,13 @@
+# 🔒 IPL Akinator — Git Ignore
+# ──────────────────────────────────────────
+# config.js holds your Gemini API key.
+# NEVER commit this file to GitHub!
+config.js
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
