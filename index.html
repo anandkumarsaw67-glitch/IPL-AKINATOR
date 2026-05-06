@@ -12,7 +12,7 @@
 <div id="app">
   <!-- Top Navigation -->
   <header class="top-nav">
-    <div class="nav-brand">🏏 IPL AKINATOR</div>
+    <div class="nav-brand" id="game-brand">🏏 IPL AKINATOR</div>
     <div class="nav-lang">
       <select id="lang-select" class="lang-select" aria-label="Language Select">
         <option value="en">English</option>
@@ -29,6 +29,7 @@
     <div class="splash-hero">
       <div class="splash-glow"></div>
       <img src="genie.png" alt="Akinator Genie" class="splash-image" />
+      <div class="splash-bubble" id="splash-bubble">Think you can beat me? 😏</div>
     </div>
 
     <div>
@@ -45,10 +46,14 @@
       <div class="stat-pill"><strong>72%</strong> Confidence Threshold</div>
     </div>
 
-
-    <button class="btn-primary" id="start-btn" aria-label="Start the game">
-      <span>🚀</span> Think of a Player
-    </button>
+    <div class="splash-actions" style="display: flex; gap: 12px; justify-content: center; width: 100%; max-width: 400px; margin-top: 10px;">
+      <button class="btn-primary" id="start-btn" aria-label="Start the game">
+        <span>🚀</span> Think of a Player
+      </button>
+      <button class="btn-secondary" id="battle-mode-btn" style="border: 1px solid var(--gold); color: var(--gold);">
+        <span>⚔️</span> Battle Mode
+      </button>
+    </div>
 
     <p class="text-muted" id="offline-note">🤖 Powered by Gemini AI · Think of any IPL player ✨</p>
   </section>
@@ -57,7 +62,6 @@
        SCREEN 2 — GAME (Questions)
   ══════════════════════════════════════════ -->
   <section id="game-screen" class="screen" aria-live="polite">
-
     <div class="game-header">
       <span class="game-brand">🏏 IPL AKINATOR</span>
       <span class="question-counter" id="q-counter">Question <span id="q-num">1</span> / <span id="q-max">8</span></span>
@@ -74,7 +78,7 @@
     <!-- AI & Question Layout -->
     <div class="ai-question-wrap">
       <div class="ai-avatar-col">
-        <img src="genie.png" alt="Akinator Genie" class="ai-avatar" id="ai-avatar" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\\'http://www.w3.org/2000/svg\\' viewBox=\\'0 0 100 100\\'%3E%3Ctext y=\\'50%' x=\\'50%' font-size=\\'50\\' text-anchor=\\'middle\\' dy=\\'.3em\\'%3E🧞%3C/text%3E%3C/svg%3E'">
+        <img src="genie.png" alt="Akinator Genie" class="ai-avatar" id="ai-avatar" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\'%3E%3Ctext y=\'50%\' x=\'50%\' font-size=\'50\' text-anchor=\'middle\' dy=\'.3em\'%3E🧞%3C/text%3E%3C/svg%3E'">
       </div>
       <div class="question-col">
         <div class="ai-status-header" style="margin-bottom: 8px;">
@@ -117,10 +121,18 @@
        SCREEN 3 — GUESS REVEAL
   ══════════════════════════════════════════ -->
   <section id="guess-screen" class="screen">
-    <p class="guess-label">🎯 I think you're thinking of…</p>
+    <div class="guess-header">
+      <p class="guess-label">🎯 I think you're thinking of…</p>
+      <div class="guess-reaction-bubble" id="guess-reaction-bubble"></div>
+    </div>
 
     <div class="glass-card player-reveal-card" id="player-reveal-card">
-      <div class="player-emoji-wrap" id="player-emoji">🏏</div>
+      <div class="player-photo-wrap">
+        <div class="player-photo-glow" id="player-photo-glow"></div>
+        <img src="" alt="" class="player-photo" id="guess-player-photo" onerror="this.style.display='none'; document.getElementById('player-emoji').style.display='flex';">
+        <div class="player-emoji-wrap" id="player-emoji" style="display: none;">🏏</div>
+      </div>
+      
       <h2 class="player-name"  id="guess-player-name">Player Name</h2>
       <p class="player-meta"   id="guess-player-meta">Role · Country</p>
 
@@ -134,6 +146,14 @@
         <div class="confidence-track">
           <div class="confidence-fill" id="confidence-fill" style="width:0%"></div>
         </div>
+      </div>
+    </div>
+
+    <!-- AI Reasoning Section -->
+    <div class="explanation-container" id="explanation-container">
+      <h3 class="explanation-title">Why I guessed this?</h3>
+      <div class="explanation-box" id="explanation-box">
+        <!-- Reasoning items injected here -->
       </div>
     </div>
 
@@ -152,6 +172,11 @@
     <div class="result-icon" id="result-icon">🎉</div>
     <h2 class="result-title" id="result-title">Amazing!</h2>
     <p class="result-subtitle" id="result-subtitle">The AI got it right!</p>
+
+    <!-- Detailed Player Stats Card -->
+    <div id="detailed-player-card" class="detailed-card-container" style="display: none;">
+      <!-- Populated via JS -->
+    </div>
 
     <button class="btn-primary" id="play-again-btn">🔄 Play Again</button>
   </section>
@@ -185,13 +210,39 @@
     </div>
   </section>
 
+  <!-- ══════════════════════════════════════════
+       SCREEN 6 — BATTLE MODE (Reverse)
+  ══════════════════════════════════════════ -->
+  <section id="battle-screen" class="screen">
+    <h2 class="splash-title" style="font-size: 28px; margin-bottom: 10px;">Battle Mode ⚔️</h2>
+    <p class="text-muted" style="margin-bottom: 30px;">I'm thinking of a player. Can you guess who?</p>
+
+    <div class="clues-container" id="clues-container" style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; width: 100%;">
+      <!-- Clues injected here -->
+    </div>
+
+    <div class="glass-card" style="padding: 24px; width: 100%;">
+      <div class="player-search-wrap">
+        <input type="text" id="battle-guess-input" class="player-search" placeholder="Type player name..." autocomplete="off">
+        <div id="battle-dropdown" class="player-dropdown"></div>
+      </div>
+      <button class="btn-primary" id="submit-battle-guess" style="margin-top: 15px; width: 100%;">
+        🎯 Submit Guess
+      </button>
+    </div>
+
+    <div class="battle-actions" style="margin-top: 20px; display: flex; gap: 10px; width: 100%;">
+      <button class="btn-secondary" id="next-clue-btn" style="flex: 1;">💡 Give me a Clue</button>
+      <button class="btn-secondary" id="back-to-home-btn" style="flex: 1;">🏠 Quit</button>
+    </div>
+  </section>
+
 </div><!-- /#app -->
 
-<!-- Scripts -->
-<script src="config.js"></script>
 <script src="players.js"></script>
 <script src="questions.js"></script>
 <script src="engine.js"></script>
+<script src="battle-engine.js"></script>
 <script src="gemini.js"></script>
 <script src="main.js"></script>
 </body>

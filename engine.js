@@ -215,4 +215,27 @@ class AkinatorEngine {
     });
     localStorage.setItem("akinator_corrections", JSON.stringify(corrections));
   }
+
+  // ── Get matching evidence for a player ───────────────────────
+  getEvidence(player) {
+    if (!player) return [];
+    
+    return this.history
+      .filter(h => h.answer === "yes" || h.answer === "no")
+      .map(h => {
+        const matches = h.question.check(player);
+        const userSaidYes = h.answer === "yes";
+        
+        // Evidence is valid if user's answer matches the player attribute
+        if (userSaidYes === matches) {
+          return {
+            text: h.question.text,
+            match: true,
+            userAnswer: h.answer
+          };
+        }
+        return null;
+      })
+      .filter(e => e !== null);
+  }
 }

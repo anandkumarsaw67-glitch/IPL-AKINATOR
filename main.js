@@ -7,6 +7,7 @@ const screens = {
   guess:      document.getElementById('guess-screen'),
   result:     document.getElementById('result-screen'),
   correction: document.getElementById('correction-screen'),
+  battle:     document.getElementById('battle-screen'),
 };
 
 const els = {
@@ -29,18 +30,31 @@ const els = {
   guessPlayerTags:   document.getElementById('guess-player-tags'),
   confidencePct:     document.getElementById('confidence-pct'),
   confidenceFill:    document.getElementById('confidence-fill'),
+  explanationBox:    document.getElementById('explanation-box'),
+  guessReactionBubble: document.getElementById('guess-reaction-bubble'),
+  guessPlayerPhoto:  document.getElementById('guess-player-photo'),
+  playerPhotoGlow:   document.getElementById('player-photo-glow'),
   correctBtn:        document.getElementById('correct-btn'),
   incorrectBtn:      document.getElementById('incorrect-btn'),
   // Result screen
   resultIcon:        document.getElementById('result-icon'),
   resultTitle:       document.getElementById('result-title'),
   resultSubtitle:    document.getElementById('result-subtitle'),
+  detailedPlayerCard: document.getElementById('detailed-player-card'),
   playAgainBtn:      document.getElementById('play-again-btn'),
   // Correction screen
   playerSearch:      document.getElementById('player-search'),
   playerDropdown:    document.getElementById('player-dropdown'),
   submitCorrection:  document.getElementById('submit-correction-btn'),
   skipCorrection:    document.getElementById('skip-correction-btn'),
+  // Battle Mode
+  battleModeBtn:     document.getElementById('battle-mode-btn'),
+  battleClues:       document.getElementById('clues-container'),
+  battleInput:       document.getElementById('battle-guess-input'),
+  battleDropdown:    document.getElementById('battle-dropdown'),
+  submitBattleGuess: document.getElementById('submit-battle-guess'),
+  nextClueBtn:       document.getElementById('next-clue-btn'),
+  backToHomeBtn:     document.getElementById('back-to-home-btn'),
   // Game branding
   gameBrand:         document.querySelector('.game-brand'),
   offlineNote:       document.getElementById('offline-note'),
@@ -48,12 +62,113 @@ const els = {
 
 // ── Game State ─────────────────────────────────────────────────
 let engine           = null;
+let battleEngine     = null;
 let currentQuestion  = null;
 let selectedCorrection = null;
 let geminiEnabled    = false;
 
+// ── AI Personalities (Trash Talk) ──────────────────────────────
+const AI_REACTIONS = {
+  early: [
+    "Thinking... let's see what you've got!",
+    "Searching my database...",
+    "Interesting choice so far...",
+    "Starting to build a picture..."
+  ],
+  confident: [
+    "Too easy 😏",
+    "I think I already know who it is!",
+    "You're making this too simple for me.",
+    "Almost there... I can see the player now."
+  ],
+  difficult: [
+    "Hmm... you're trying to trick me 🤔",
+    "A tough one! Let me think harder...",
+    "Nice choice, tough player to narrow down.",
+    "You're good at this! But I'm better..."
+  ],
+  default: [
+    "Analyzing possibilities...",
+    "Crunching the numbers...",
+    "Consulting the cricket gods...",
+    "Evaluating the evidence..."
+  ]
+};
+
+function getAIReaction() {
+  if (!engine) return AI_REACTIONS.default[0];
+  const state = engine.getState();
+  
+  // High confidence (> 50%)
+  if (state.confidence > 50) {
+    return AI_REACTIONS.confident[Math.floor(Math.random() * AI_REACTIONS.confident.length)];
+  }
+  
+  // Late game and low confidence
+  if (state.questionsAsked > 7 && state.confidence < 30) {
+    return AI_REACTIONS.difficult[Math.floor(Math.random() * AI_REACTIONS.difficult.length)];
+  }
+  
+  // Early game
+  if (state.questionsAsked < 3) {
+    return AI_REACTIONS.early[Math.floor(Math.random() * AI_REACTIONS.early.length)];
+  }
+  
+  return AI_REACTIONS.default[Math.floor(Math.random() * AI_REACTIONS.default.length)];
+}
+
+function getPlayerImage(player) {
+  // Using a search-based thumbnail service for IPL players
+  return `https://tse1.mm.bing.net/th?q=${encodeURIComponent(player.name + ' IPL profile')}&w=300&h=300&c=7&rs=1&p=0&dpr=1&pid=1.7`;
+}
+
+const GUESS_REACTIONS = {
+  high: [
+    "Too easy 😏",
+    "I've got you! 🏏",
+    "Piece of cake!",
+    "Victory is mine!"
+  ],
+  medium: [
+    "I'm pretty sure it's...",
+    "The data points to...",
+    "This must be your player!"
+  ],
+  low: [
+    "Hmm... you're trying to trick me 🤔",
+    "A tough one, but I'll go with...",
+    "Is it this player? Maybe..."
+  ]
+};
+
+const SPLASH_PHRASES = [
+  "Think you can beat me? 😏",
+  "I've got 40+ players in my head... 🧠",
+  "Ready to lose? I'm unbeatable! 🏆",
+  "Pick a tough one! I dare you. 🦁",
+  "The AI mind is ready for your challenge. ⚡",
+  "Is it Virat? Dhoni? Rohit? I'll find out! 🏏",
+  "Your thoughts are my playground... 🔮"
+];
+
+function initSplashReactions() {
+  const bubble = document.getElementById('splash-bubble');
+  if (!bubble) return;
+  
+  let index = 0;
+  setInterval(() => {
+    bubble.style.opacity = '0';
+    setTimeout(() => {
+      index = (index + 1) % SPLASH_PHRASES.length;
+      bubble.textContent = SPLASH_PHRASES[index];
+      bubble.style.opacity = '1';
+    }, 500);
+  }, 6000);
+}
+
 // ── Auto-Load Key from config.js (silent) ─────────────────────
 (function autoLoadConfig() {
+  initSplashReactions();
   try {
     const key = (typeof CONFIG !== 'undefined') && CONFIG.GEMINI_API_KEY;
     if (key && key !== 'YOUR_GEMINI_API_KEY_HERE' && key.length > 10) {
@@ -178,9 +293,11 @@ function displayQuestion(question, aiPhrasedText = null) {
 function setThinking(on) {
   if (on) {
     els.aiAvatar.classList.add('thinking');
-    els.aiStatus.textContent = geminiEnabled
-      ? 'Consulting Gemini AI…'
-      : 'Analyzing possibilities…';
+    
+    // Choose a reaction
+    const reaction = getAIReaction();
+    els.aiStatus.textContent = reaction;
+    
     els.questionText.innerHTML = `
       <span class="thinking-dots">
         <span></span><span></span><span></span>
@@ -219,12 +336,31 @@ async function showGuessScreen(player, confidence) {
   }
 
   // Base card population
-  els.playerEmoji.textContent      = player.emoji;
   els.guessPlayerName.textContent  = player.name;
   els.guessPlayerMeta.textContent  = `${player.role} · ${player.country}`;
   els.guessPlayerTags.innerHTML    = buildTags(player);
   els.confidencePct.textContent    = confidence + '%';
   els.confidenceFill.style.width   = '0%';
+
+  // Set Photo
+  els.guessPlayerPhoto.src = getPlayerImage(player);
+  els.guessPlayerPhoto.style.display = 'block';
+  els.playerEmoji.style.display = 'none';
+  
+  // Set Dynamic Glow Color
+  if (player.teamColor) {
+    els.playerPhotoGlow.style.background = player.teamColor;
+  } else {
+    els.playerPhotoGlow.style.background = 'var(--gold)';
+  }
+
+  // Set Guess Reaction
+  let reactionPool;
+  if (confidence > 80) reactionPool = GUESS_REACTIONS.high;
+  else if (confidence > 40) reactionPool = GUESS_REACTIONS.medium;
+  else reactionPool = GUESS_REACTIONS.low;
+  
+  els.guessReactionBubble.textContent = reactionPool[Math.floor(Math.random() * reactionPool.length)];
 
   // If Gemini enabled, fetch a dramatic reveal message
   if (geminiEnabled) {
@@ -244,6 +380,22 @@ async function showGuessScreen(player, confidence) {
   } else {
     showScreen('guess');
     setTimeout(() => { els.confidenceFill.style.width = confidence + '%'; }, 400);
+  }
+
+  // Populate AI Reasoning
+  const evidence = engine.getEvidence(player);
+  if (evidence.length > 0) {
+    els.explanationBox.innerHTML = evidence.slice(0, 4).map(e => `
+      <div class="explanation-item">
+        <span class="${e.userAnswer === 'yes' ? 'check' : 'cross'}">
+          ${e.userAnswer === 'yes' ? '✔' : '✖'}
+        </span>
+        <span>You said ${e.userAnswer.toUpperCase()}: ${e.text}</span>
+      </div>
+    `).join('');
+    document.getElementById('explanation-container').style.display = 'block';
+  } else {
+    document.getElementById('explanation-container').style.display = 'none';
   }
 }
 
@@ -270,12 +422,76 @@ function showResult(correct) {
     els.resultIcon.textContent     = '🎉';
     els.resultTitle.textContent    = 'Got it! 🏏';
     els.resultSubtitle.textContent = `Guessed in ${engine.questionCount} question${engine.questionCount !== 1 ? 's' : ''}! The AI mind is unstoppable. 😎`;
+    
+    // Show detailed card for correct guess
+    const state = engine.getState();
+    if (state.topPlayer) {
+      els.detailedPlayerCard.innerHTML = buildDetailedPlayerCard(state.topPlayer);
+      els.detailedPlayerCard.style.display = 'block';
+    }
   } else {
     els.resultIcon.textContent     = '😅';
     els.resultTitle.textContent    = 'Stumped me!';
     els.resultSubtitle.textContent = 'You outsmarted the AI this time! I\'ll learn from this. 📚';
+    els.detailedPlayerCard.style.display = 'none';
   }
   showScreen('result');
+}
+
+function buildDetailedPlayerCard(player) {
+  const teamsStr = player.teams.join(', ');
+  const fact = generateFunFact(player);
+  const photoUrl = getPlayerImage(player);
+  const accentColor = player.teamColor || '#F4D03F';
+  
+  return `
+    <div class="glass-card detailed-card" style="border-top: 5px solid ${accentColor}">
+      <div class="player-photo-wrap" style="width: 100px; height: 100px; margin-bottom: 15px;">
+        <div class="player-photo-glow" style="background: ${accentColor}; opacity: 0.4;"></div>
+        <img src="${photoUrl}" class="player-photo" style="border: 2px solid ${accentColor}">
+      </div>
+      
+      <h3 style="color: ${accentColor}">${player.name}</h3>
+      <span class="player-subtitle">${player.role} from ${player.country}</span>
+      
+      <div class="stat-grid">
+        <div class="stat-item">
+          <span class="stat-label">Teams Played</span>
+          <span class="stat-value">${teamsStr}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">IPL Titles</span>
+          <span class="stat-value">${player.titles > 0 ? player.titles + 'x Winner' : 'None yet'}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Captaincy</span>
+          <span class="stat-value">${player.isCaptain ? 'Yes' : 'No'}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Batting</span>
+          <span class="stat-value">${player.battingPosition || 'N/A'} order</span>
+        </div>
+      </div>
+      
+      <div class="fun-fact-box" style="border-left-color: ${accentColor}">
+        <span class="fun-fact-label" style="color: ${accentColor}">Did you know? 💡</span>
+        <p class="fun-fact-text">${fact}</p>
+      </div>
+    </div>
+  `;
+}
+
+function generateFunFact(p) {
+  if (p.id === 'ms_dhoni') return "He is the only captain to win all three major ICC trophies and has finished more IPL games than anyone else!";
+  if (p.id === 'virat_kohli') return "He holds the record for most runs in a single IPL season (973 runs in 2016)!";
+  if (p.id === 'rohit_sharma') return "He has won 6 IPL titles in total (5 as MI captain and 1 as a player for Deccan Chargers).";
+  
+  if (p.isYoung) return "This player is one of the brightest rising stars in modern IPL cricket!";
+  if (p.titles >= 3) return "This player is considered 'IPL Royalty' with multiple championship rings!";
+  if (p.country === 'Overseas') return "A true globe-trotter, bringing international flair to the IPL stadium!";
+  if (p.isCaptain) return "A proven leader who has shouldered the responsibility of an entire franchise.";
+  
+  return `${p.name} is a key asset for ${p.teams[p.teams.length-1]}, known for their consistent impact in the league.`;
 }
 
 // ── Correction Screen ──────────────────────────────────────────
@@ -383,7 +599,19 @@ els.answerBtns.forEach(btn => {
 els.restartMidBtn.addEventListener('click', () => showScreen('splash'));
 els.correctBtn.addEventListener('click', () => showResult(true));
 els.incorrectBtn.addEventListener('click', () => initCorrectionScreen());
-els.playAgainBtn.addEventListener('click', () => showScreen('splash'));
+  els.playAgainBtn.addEventListener('click', () => {
+    initGame();
+  });
+  
+  // Battle Mode Listeners
+  els.battleModeBtn.addEventListener('click', initBattleMode);
+  els.nextClueBtn.addEventListener('click', revealNextClue);
+  els.backToHomeBtn.addEventListener('click', () => showScreen('splash'));
+  els.submitBattleGuess.addEventListener('click', submitBattleGuess);
+  
+  els.battleInput.addEventListener('input', (e) => {
+    updateBattleDropdown(e.target.value);
+  });
 
 // Close dropdown on outside click
 document.addEventListener('click', e => {
@@ -391,6 +619,86 @@ document.addEventListener('click', e => {
     els.playerDropdown.classList.remove('open');
   }
 });
+
+// ── Battle Mode ────────────────────────────────────────────────
+function initBattleMode() {
+  battleEngine = new BattleEngine(PLAYERS);
+  els.battleInput.value = '';
+  els.battleDropdown.style.display = 'none';
+  renderClues();
+  showScreen('battle');
+}
+
+function renderClues() {
+  const revealed = battleEngine.getRevealedClues();
+  els.battleClues.innerHTML = revealed.map(clue => `
+    <div class="clue-item">${clue}</div>
+  `).join('');
+  
+  // Auto scroll to bottom
+  els.battleClues.scrollTop = els.battleClues.scrollHeight;
+  
+  // Disable next clue button if no more clues
+  els.nextClueBtn.disabled = battleEngine.revealedClueCount >= battleEngine.clues.length;
+}
+
+function revealNextClue() {
+  if (battleEngine.revealNextClue()) {
+    renderClues();
+  }
+}
+
+function submitBattleGuess() {
+  const guess = els.battleInput.value;
+  if (!guess) return;
+  
+  const correct = battleEngine.checkGuess(guess);
+  if (correct) {
+    showResult(true);
+    // Overwrite some text for battle win
+    els.resultTitle.textContent = "Victory! ⚔️";
+    els.resultSubtitle.textContent = `You correctly guessed ${battleEngine.targetPlayer.name}! The AI was no match for you.`;
+  } else {
+    // Small shake animation or red glow? For now just alert or status
+    els.battleInput.style.borderColor = '#ff5252';
+    setTimeout(() => els.battleInput.style.borderColor = '', 1000);
+    
+    // Maybe show a "Wrong" status temporarily
+    const originalText = els.submitBattleGuess.textContent;
+    els.submitBattleGuess.textContent = "❌ Wrong Guess! Try again";
+    els.submitBattleGuess.style.background = "#ff5252";
+    
+    setTimeout(() => {
+      els.submitBattleGuess.textContent = originalText;
+      els.submitBattleGuess.style.background = "";
+    }, 2000);
+  }
+}
+
+function updateBattleDropdown(query) {
+  if (!query || query.length < 2) {
+    els.battleDropdown.style.display = 'none';
+    return;
+  }
+  
+  const matches = PLAYERS.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 5);
+  if (matches.length > 0) {
+    els.battleDropdown.innerHTML = matches.map(p => `
+      <div class="dropdown-item" data-id="${p.id}">${p.name}</div>
+    `).join('');
+    els.battleDropdown.style.display = 'block';
+    
+    // Click to select
+    els.battleDropdown.querySelectorAll('.dropdown-item').forEach(item => {
+      item.addEventListener('click', () => {
+        els.battleInput.value = item.textContent;
+        els.battleDropdown.style.display = 'none';
+      });
+    });
+  } else {
+    els.battleDropdown.style.display = 'none';
+  }
+}
 
 // ── Utility ───────────────────────────────────────────────────
 function sleep(ms) {
