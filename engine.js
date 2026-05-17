@@ -1,10 +1,46 @@
 // 🧠 IPL Akinator — Bayesian Decision Engine
 
 class AkinatorEngine {
-  constructor(players, questions) {
+  constructor(players, questions, learnedData = { corrections: [] }) {
     this.allPlayers = players;
-    this.allQuestions = questions;
+    // Merge stat-based questions from real dataset if available
+    this.allQuestions = typeof STAT_QUESTIONS !== 'undefined'
+      ? [...questions, ...STAT_QUESTIONS]
+      : questions;
+    this.learnedData = learnedData;
+    this._compileOverrides();
     this.reset();
+  }
+
+  // Compile corrections into an override map: { playerId: { questionId: { yes: count, no: count } } }
+  _compileOverrides() {
+    this.overrides = {};
+    const corrections = this.learnedData.corrections || [];
+    
+    corrections.forEach(c => {
+      const pId = c.correctPlayer;
+      if (!this.overrides[pId]) this.overrides[pId] = {};
+      
+      c.history.forEach(h => {
+        if (h.answer === 'yes' || h.answer === 'no') {
+          if (!this.overrides[pId][h.qid]) this.overrides[pId][h.qid] = { yes: 0, no: 0 };
+          this.overrides[pId][h.qid][h.answer]++;
+        }
+      });
+    });
+  }
+
+  // Check if a player matches a question, consulting learned overrides first
+  checkMatch(question, player) {
+    // If we have learned data for this player and question
+    if (this.overrides[player.id] && this.overrides[player.id][question.id]) {
+      const stats = this.overrides[player.id][question.id];
+      // If there's a strong consensus (e.g., more 'yes' corrections than 'no')
+      if (stats.yes > stats.no) return true;
+      if (stats.no > stats.yes) return false;
+    }
+    // Fallback to default hardcoded rule
+    return question.check(player);
   }
 
   reset() {
@@ -16,7 +52,9 @@ class AkinatorEngine {
     this.askedQuestions = new Set();
     this.questionCount = 0;
     this.maxQuestions = 10;
-    this.confidenceThreshold = 0.72;
+    this.confidenceThreshold = 0.9;
+    this.confidenceMargin = 0.25;
+    this.minQuestionsBeforeGuess = 3;
     this.history = []; // { question, answer } log
   }
 
@@ -68,7 +106,7 @@ class AkinatorEngine {
 
     let yesWeight = 0, noWeight = 0;
     active.forEach(p => {
-      if (question.check(p)) {
+      if (this.checkMatch(question, p)) {
         yesWeight += this.weights[p.id];
       } else {
         noWeight += this.weights[p.id];
@@ -82,8 +120,8 @@ class AkinatorEngine {
     const pNo  = noWeight  / total;
 
     const hBefore = this.getEntropy();
-    const hYes = this._subsetEntropy(active.filter(p => question.check(p)));
-    const hNo  = this._subsetEntropy(active.filter(p => !question.check(p)));
+    const hYes = this._subsetEntropy(active.filter(p => this.checkMatch(question, p)));
+    const hNo  = this._subsetEntropy(active.filter(p => !this.checkMatch(question, p)));
     const hAfter = pYes * hYes + pNo * hNo;
 
     return hBefore - hAfter;
@@ -99,6 +137,14 @@ class AkinatorEngine {
     }, 0);
   }
 
+  _normalizeWeights() {
+    const total = Object.values(this.weights).reduce((sum, w) => sum + w, 0);
+    if (total <= 0) return;
+    Object.keys(this.weights).forEach(id => {
+      this.weights[id] = this.weights[id] / total;
+    });
+  }
+
   // ── Select the best next question ─────────────────────────────
   // Early game (>10 players): random pick from TOP 3 — adds variety
   // Late game (≤10 players) : always pick single best — precision matters
@@ -111,7 +157,7 @@ class AkinatorEngine {
     // Filter out useless questions (0% or 100% split on remaining players)
     const useful = unanswered.filter(q => {
       const active = this.activePlayers;
-      const yesCount = active.filter(p => q.check(p)).length;
+      const yesCount = active.filter(p => this.checkMatch(q, p)).length;
       return yesCount > 0 && yesCount < active.length;
     });
 
@@ -122,11 +168,11 @@ class AkinatorEngine {
       .map(q => ({ q, gain: this.informationGain(q) }))
       .sort((a, b) => b.gain - a.gain);
 
-    const isEarlyGame = this.activePlayers.length > 10;
+    const isEarlyGame = this.activePlayers.length > 20;
 
     if (isEarlyGame) {
-      // Pick randomly from the top 3 to vary the opening questions each game
-      const topN = scored.slice(0, Math.min(3, scored.length));
+      // Pick randomly from the top 2 to vary the opening questions slightly
+      const topN = scored.slice(0, Math.min(2, scored.length));
       return topN[Math.floor(Math.random() * topN.length)].q;
     } else {
       // Pick strictly the best question to close in on the answer
@@ -145,45 +191,54 @@ class AkinatorEngine {
     this.history.push({ question, answer });
 
     this.activePlayers.forEach(player => {
-      const matches = question.check(player);
+      const matches = this.checkMatch(question, player);
 
       switch (answer) {
         case "yes":
-          // Soft eliminate non-matching players (heavy penalty instead of 0)
-          if (!matches) this.weights[player.id] *= 0.05;
-          else this.weights[player.id] *= 2.0; // Reward matching players
+          if (!matches) this.weights[player.id] *= 0.01;
+          else this.weights[player.id] *= 3.0;
           break;
 
         case "no":
-          // Soft eliminate matching players
-          if (matches) this.weights[player.id] *= 0.05;
-          else this.weights[player.id] *= 2.0; // Reward non-matching players
+          if (matches) this.weights[player.id] *= 0.01;
+          else this.weights[player.id] *= 3.0;
           break;
 
         case "maybe":
-          // Soft penalty: matching gets slight boost, non-matching slight penalty
           if (!matches) {
-            this.weights[player.id] *= 0.6;
+            this.weights[player.id] *= 0.85;
           } else {
-            this.weights[player.id] *= 1.2;
+            this.weights[player.id] *= 1.15;
           }
           break;
 
         case "idk":
-          // No update — skip question
           break;
       }
     });
+
+    this._normalizeWeights();
   }
 
   // ── Check if engine should guess now ──────────────────────────
   shouldGuess() {
-    const top = this.getTopCandidate();
-    if (!top) return false;
+    const ranked = this.getRankedPlayers();
+    if (ranked.length === 0) return false;
 
-    if (top.prob >= this.confidenceThreshold) return true;
-    if (this.questionCount >= this.maxQuestions) return true;
+    const top = ranked[0];
+    const second = ranked[1] || { prob: 0 };
+    const margin = top.prob - second.prob;
+    const strongConfidence = top.prob >= this.confidenceThreshold && margin >= this.confidenceMargin;
+    const safeConfidence = this.questionCount >= this.minQuestionsBeforeGuess && top.prob >= 0.8 && margin >= 0.2;
+
     if (this.activePlayers.length === 1) return true;
+    if (strongConfidence) return true;
+    if (safeConfidence) return true;
+
+    // Force guess only when we run out of questions
+    if (this.questionCount >= this.maxQuestions) {
+      return true;
+    }
 
     return false;
   }
@@ -223,7 +278,7 @@ class AkinatorEngine {
     return this.history
       .filter(h => h.answer === "yes" || h.answer === "no")
       .map(h => {
-        const matches = h.question.check(player);
+        const matches = this.checkMatch(h.question, player);
         const userSaidYes = h.answer === "yes";
         
         // Evidence is valid if user's answer matches the player attribute

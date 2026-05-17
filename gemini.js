@@ -4,10 +4,16 @@ const GEMINI_MODEL = 'gemini-2.0-flash';
 const GEMINI_BASE  = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 let _apiKey = null;
+let _currentLang = 'English';
 
 // ── Set API Key ────────────────────────────────────────────────
 function setGeminiKey(key) {
   _apiKey = key ? key.trim() : null;
+}
+
+function setGeminiLang(lang) {
+  const map = { 'en': 'English', 'hi': 'Hindi', 'ta': 'Tamil' };
+  _currentLang = map[lang] || 'English';
 }
 
 function hasGeminiKey() {
@@ -83,6 +89,7 @@ Rules:
 - Keep cricket context clear
 - Sound confident and mysterious  
 - Do NOT add quotes around your answer
+- IMPORTANT: You MUST translate and output the final rephrased question in ${_currentLang} language.
 - Output only the rephrased question, nothing else`;
 
   return await geminiGenerate(prompt);
@@ -102,6 +109,7 @@ Rules:
 - Mention the player name
 - Sound dramatic and confident
 - Keep it cricket/IPL themed
+- IMPORTANT: You MUST translate and output the final statement in ${_currentLang} language.
 - Output only the statement, nothing else`;
 
   return await geminiGenerate(prompt);
@@ -117,7 +125,9 @@ You've asked ${questionsAsked} questions and narrowed it down to ${remainingPlay
 Write a very short thinking status (max 8 words, present tense, no punctuation at end):
 Like: "Scanning through top-order batsmen", "Cross-referencing overseas players"
 
-Output only the status, nothing else.`;
+Rules:
+- IMPORTANT: You MUST translate and output the final status in ${_currentLang} language.
+- Output only the status, nothing else.`;
 
   return await geminiGenerate(prompt);
 }

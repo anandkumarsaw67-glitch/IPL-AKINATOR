@@ -96,7 +96,7 @@ body::after {
 .screen {
   display: none;
   width: 100%;
-  max-width: 640px;
+  max-width: 800px;
   animation: screenIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
@@ -301,6 +301,7 @@ body::after {
 /* ── GAME SCREEN ──────────────────────────────────────────────── */
 #game-screen {
   gap: 20px;
+  position: relative;
 }
 
 .game-header {
@@ -365,14 +366,16 @@ body::after {
 .ai-question-wrap {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
+  gap: 24px;
 }
 
 .ai-avatar-col {
   position: absolute;
-  left: -250px;
-  bottom: -40px;
+  left: -180px;
+  top: 45px;
+  flex-shrink: 0;
   z-index: 0;
   pointer-events: none;
 }
@@ -387,15 +390,15 @@ body::after {
 }
 
 .ai-avatar {
-  width: 300px;
-  height: 300px;
-  min-width: 300px;
+  width: 200px;
+  height: 200px;
+  min-width: 200px;
   object-fit: contain;
   border-radius: 50%;
   /* in case image is square, but transparent PNG works best */
   position: relative;
   flex-shrink: 0;
-  transition: transform 0.3s ease;
+  transition: all 0.3s ease;
   filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
 }
 
@@ -588,7 +591,7 @@ body::after {
 /* ── Answer Buttons ───────────────────────────────────────────── */
 .answers-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   width: 100%;
 }
@@ -763,7 +766,7 @@ body::after {
 
 /* ── GUESS SCREEN ─────────────────────────────────────────────── */
 #guess-screen {
-  gap: 24px;
+  gap: 12px;
   text-align: center;
 }
 
@@ -771,8 +774,8 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 0px;
 }
 
 .guess-label {
@@ -803,7 +806,7 @@ body::after {
 .player-reveal-card {
   width: 100%;
   animation: revealDrama 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-  margin-bottom: 24px;
+  margin-bottom: 0px;
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -874,7 +877,7 @@ body::after {
 /* ── REASONING SECTION ─────────────────────────────────────────── */
 .explanation-container {
   width: 100%;
-  margin-bottom: 32px;
+  margin-bottom: 0px;
   animation: fadeIn 0.8s ease 0.4s forwards;
   opacity: 0;
 }
@@ -1479,7 +1482,66 @@ body::after {
 }
 
 /* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .screen {
+    max-width: 100%;
+  }
+
+  .top-nav {
+    padding: 16px 20px;
+  }
+
+  .ai-question-wrap {
+    flex-direction: column;
+    text-align: center;
+    gap: 16px;
+  }
+  
+  .ai-avatar-col {
+    position: relative;
+    left: auto;
+    top: auto;
+    transform: none; /* Reset on mobile */
+  }
+
+  .ai-avatar {
+    width: 200px;
+    height: 200px;
+    min-width: 200px;
+  }
+
+  .answers-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .splash-hero {
+    width: 200px;
+    height: 200px;
+    transform: none; /* Reset on mobile */
+  }
+
+  .splash-bubble {
+    right: -40px;
+    max-width: 140px;
+    font-size: 12px;
+  }
+}
+
 @media (max-width: 480px) {
+  .top-nav {
+    padding: 16px;
+    justify-content: flex-end;
+  }
+  
+  .nav-brand {
+    display: none;
+  }
+
+  .lang-select {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
   .glass-card {
     padding: 22px 18px;
   }
@@ -1492,6 +1554,12 @@ body::after {
   .answer-btn {
     padding: 14px 10px;
     font-size: 14px;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .answer-btn .btn-icon {
+    font-size: 24px;
   }
 
   .guess-actions {

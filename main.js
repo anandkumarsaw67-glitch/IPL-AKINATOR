@@ -66,6 +66,7 @@ let battleEngine     = null;
 let currentQuestion  = null;
 let selectedCorrection = null;
 let geminiEnabled    = false;
+let globalLearnedData = { corrections: [], custom_players: [] };
 
 // ── AI Personalities (Trash Talk) ──────────────────────────────
 const AI_REACTIONS = {
@@ -181,7 +182,31 @@ function initSplashReactions() {
   } catch (e) {
     // CONFIG not defined — silent fallback to offline mode
   }
+  loadLearnedData();
 })();
+
+async function loadLearnedData() {
+  try {
+    const res = await fetch('learned_data.json');
+    if (res.ok) {
+      const data = await res.json();
+      globalLearnedData.corrections = data.corrections || [];
+      globalLearnedData.custom_players = data.custom_players || [];
+    }
+  } catch (e) {
+    console.log("No learned_data.json found or failed to load. Starting fresh.");
+  }
+
+  // Merge with local storage
+  const localCorrections = JSON.parse(localStorage.getItem('akinator_corrections') || '[]');
+  // Avoid duplicates by timestamp
+  const existingTimestamps = new Set(globalLearnedData.corrections.map(c => c.timestamp));
+  localCorrections.forEach(lc => {
+    if (!existingTimestamps.has(lc.timestamp)) {
+      globalLearnedData.corrections.push(lc);
+    }
+  });
+}
 
 // ── Screen Management ──────────────────────────────────────────
 function showScreen(name) {
@@ -202,7 +227,7 @@ function initGame() {
     }
   });
 
-  engine = new AkinatorEngine(PLAYERS, QUESTIONS);
+  engine = new AkinatorEngine(PLAYERS, QUESTIONS, globalLearnedData);
   updateUI();
   showScreen('game');
 
@@ -223,6 +248,11 @@ function updateUI() {
   els.qNum.textContent           = asked + 1;
   els.qMax.textContent           = max;
   els.candidateCount.textContent = state.activeCandidates;
+
+  const probEl = document.getElementById('current-prob');
+  if (probEl) {
+    probEl.textContent = state.confidence;
+  }
 
   const pct = Math.round((asked / max) * 100);
   els.progressFill.style.width = pct + '%';
@@ -413,6 +443,15 @@ function buildTags(player) {
   }
   if (player.isCaptain)
     html += `<span class="tag tag-role">Captain</span>`;
+  
+  // Add real stats tags from dataset
+  const rs = (typeof PLAYER_REAL_STATS !== 'undefined') ? PLAYER_REAL_STATS[player.id] : null;
+  if (rs) {
+    if (rs.totalRuns > 1000)
+      html += `<span class="tag" style="background:rgba(76,175,80,0.15);color:#4CAF50;border:1px solid rgba(76,175,80,0.4);">🏏 ${rs.totalRuns.toLocaleString()} runs</span>`;
+    if (rs.totalWickets > 50)
+      html += `<span class="tag" style="background:rgba(244,67,54,0.15);color:#F44336;border:1px solid rgba(244,67,54,0.4);">🎳 ${rs.totalWickets} wickets</span>`;
+  }
   return html;
 }
 
@@ -444,6 +483,25 @@ function buildDetailedPlayerCard(player) {
   const photoUrl = getPlayerImage(player);
   const accentColor = player.teamColor || '#F4D03F';
   
+  // Get real stats from dataset
+  const rs = (typeof PLAYER_REAL_STATS !== 'undefined') ? PLAYER_REAL_STATS[player.id] : null;
+  
+  let statsHTML = '';
+  if (rs) {
+    statsHTML = `
+      <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px;">
+        <div class="stat-item"><span class="stat-label">Runs</span><span class="stat-value" style="color:${accentColor}">${rs.totalRuns.toLocaleString()}</span></div>
+        <div class="stat-item"><span class="stat-label">Avg</span><span class="stat-value">${rs.battingAvg}</span></div>
+        <div class="stat-item"><span class="stat-label">SR</span><span class="stat-value">${rs.battingSR}</span></div>
+        <div class="stat-item"><span class="stat-label">Wickets</span><span class="stat-value" style="color:${accentColor}">${rs.totalWickets}</span></div>
+        <div class="stat-item"><span class="stat-label">6s</span><span class="stat-value">${rs.sixes}</span></div>
+        <div class="stat-item"><span class="stat-label">HS</span><span class="stat-value">${rs.highScore}${rs.hundreds > 0 ? '*' : ''}</span></div>
+        <div class="stat-item"><span class="stat-label">50s / 100s</span><span class="stat-value">${rs.fifties} / ${rs.hundreds}</span></div>
+        <div class="stat-item"><span class="stat-label">PoM</span><span class="stat-value">${rs.playerOfMatch}</span></div>
+        <div class="stat-item"><span class="stat-label">Seasons</span><span class="stat-value">${rs.seasonsPlayed}</span></div>
+      </div>`;
+  }
+  
   return `
     <div class="glass-card detailed-card" style="border-top: 5px solid ${accentColor}">
       <div class="player-photo-wrap" style="width: 100px; height: 100px; margin-bottom: 15px;">
@@ -463,15 +521,10 @@ function buildDetailedPlayerCard(player) {
           <span class="stat-label">IPL Titles</span>
           <span class="stat-value">${player.titles > 0 ? player.titles + 'x Winner' : 'None yet'}</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">Captaincy</span>
-          <span class="stat-value">${player.isCaptain ? 'Yes' : 'No'}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">Batting</span>
-          <span class="stat-value">${player.battingPosition || 'N/A'} order</span>
-        </div>
       </div>
+
+      ${rs ? '<h4 style="color:var(--text-muted); margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">📊 Real IPL Stats (2008-2025)</h4>' : ''}
+      ${statsHTML}
       
       <div class="fun-fact-box" style="border-left-color: ${accentColor}">
         <span class="fun-fact-label" style="color: ${accentColor}">Did you know? 💡</span>
@@ -605,6 +658,20 @@ els.incorrectBtn.addEventListener('click', () => initCorrectionScreen());
   
   // Battle Mode Listeners
   els.battleModeBtn.addEventListener('click', initBattleMode);
+  
+  const exportBtn = document.getElementById('export-brain-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(globalLearnedData, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href",     dataStr);
+      downloadAnchorNode.setAttribute("download", "learned_data.json");
+      document.body.appendChild(downloadAnchorNode); // required for firefox
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      alert("Brain data exported! Replace your learned_data.json file with this new one.");
+    });
+  }
   els.nextClueBtn.addEventListener('click', revealNextClue);
   els.backToHomeBtn.addEventListener('click', () => showScreen('splash'));
   els.submitBattleGuess.addEventListener('click', submitBattleGuess);
@@ -619,6 +686,107 @@ document.addEventListener('click', e => {
     els.playerDropdown.classList.remove('open');
   }
 });
+
+// ── Translations ───────────────────────────────────────────────
+const UI_TRANSLATIONS = {
+  en: {
+    splashTitle: "Ready to be amazed?",
+    splashSub: "Think of any <span>IPL cricket player</span>.<br/>I'll read your mind using the power of AI. 🧠",
+    startBtn: "<span>🚀</span> Think of a Player",
+    battleBtn: "<span>⚔️</span> Battle Mode",
+    yes: "<span class=\"btn-icon\">✅</span> Yes",
+    no: "<span class=\"btn-icon\">❌</span> No",
+    maybe: "<span class=\"btn-icon\">🤔</span> Maybe",
+    idk: "<span class=\"btn-icon\">🤷</span> Don't Know",
+    restartBtn: "↩ Start Over",
+    guessLabel: "🎯 I think you're thinking of…",
+    correctBtn: "🎉 Yes, correct!",
+    incorrectBtn: "❌ Nope, wrong!",
+    playAgainBtn: "🔄 Play Again",
+    battleInput: "Type player name...",
+    submitBattle: "🎯 Submit Guess",
+    nextClue: "💡 Give me a Clue",
+    quit: "🏠 Quit"
+  },
+  hi: {
+    splashTitle: "क्या आप हैरान होने के लिए तैयार हैं?",
+    splashSub: "किसी भी <span>IPL खिलाड़ी</span> के बारे में सोचें।<br/>मैं AI की मदद से आपका दिमाग पढ़ लूंगा। 🧠",
+    startBtn: "<span>🚀</span> खिलाड़ी सोचें",
+    battleBtn: "<span>⚔️</span> बैटल मोड",
+    yes: "<span class=\"btn-icon\">✅</span> हाँ",
+    no: "<span class=\"btn-icon\">❌</span> नहीं",
+    maybe: "<span class=\"btn-icon\">🤔</span> शायद",
+    idk: "<span class=\"btn-icon\">🤷</span> पता नहीं",
+    restartBtn: "↩ फिर से शुरू करें",
+    guessLabel: "🎯 मुझे लगता है कि आप सोच रहे हैं…",
+    correctBtn: "🎉 हाँ, सही है!",
+    incorrectBtn: "❌ नहीं, गलत है!",
+    playAgainBtn: "🔄 फिर से खेलें",
+    battleInput: "खिलाड़ी का नाम लिखें...",
+    submitBattle: "🎯 उत्तर दें",
+    nextClue: "💡 सुराग दें",
+    quit: "🏠 बाहर निकलें"
+  },
+  ta: {
+    splashTitle: "ஆச்சரியப்பட தயாராக உள்ளீர்களா?",
+    splashSub: "ஏதேனும் <span>IPL கிரிக்கெட் வீரரை</span> நினைத்துக் கொள்ளுங்கள்.<br/>AI மூலம் உங்கள் மனதை படிப்பேன். 🧠",
+    startBtn: "<span>🚀</span> வீரரை நினைக்கவும்",
+    battleBtn: "<span>⚔️</span> போர் முறை",
+    yes: "<span class=\"btn-icon\">✅</span> ஆம்",
+    no: "<span class=\"btn-icon\">❌</span> இல்லை",
+    maybe: "<span class=\"btn-icon\">🤔</span> இருக்கலாம்",
+    idk: "<span class=\"btn-icon\">🤷</span> தெரியாது",
+    restartBtn: "↩ மீண்டும் தொடங்கு",
+    guessLabel: "🎯 நீங்கள் இதைத்தான் நினைத்தீர்கள்…",
+    correctBtn: "🎉 ஆம், சரி!",
+    incorrectBtn: "❌ இல்லை, தவறு!",
+    playAgainBtn: "🔄 மீண்டும் விளையாடு",
+    battleInput: "வீரரின் பெயரை தட்டச்சு செய்க...",
+    submitBattle: "🎯 சமர்ப்பி",
+    nextClue: "💡 ஒரு குறிப்பு கொடுங்கள்",
+    quit: "🏠 வெளியேறு"
+  }
+};
+
+function updateLanguage(lang) {
+  if (typeof setGeminiLang === 'function') setGeminiLang(lang);
+  const t = UI_TRANSLATIONS[lang] || UI_TRANSLATIONS['en'];
+  
+  const safeHtml = (selector, html) => {
+    const el = document.querySelector(selector);
+    if (el) el.innerHTML = html;
+  };
+
+  safeHtml('.splash-title', t.splashTitle);
+  safeHtml('.splash-subtitle', t.splashSub);
+  safeHtml('#start-btn', t.startBtn);
+  safeHtml('#battle-mode-btn', t.battleBtn);
+  
+  safeHtml('#btn-yes', t.yes);
+  safeHtml('#btn-no', t.no);
+  safeHtml('#btn-maybe', t.maybe);
+  safeHtml('#btn-idk', t.idk);
+  
+  safeHtml('#restart-mid-btn', t.restartBtn);
+  safeHtml('.guess-label', t.guessLabel);
+  safeHtml('#correct-btn', t.correctBtn);
+  safeHtml('#incorrect-btn', t.incorrectBtn);
+  safeHtml('#play-again-btn', t.playAgainBtn);
+
+  // Battle mode specific
+  const battleInput = document.getElementById('battle-guess-input');
+  if (battleInput) battleInput.placeholder = t.battleInput;
+  safeHtml('#submit-battle-guess', t.submitBattle);
+  safeHtml('#next-clue-btn', t.nextClue);
+  safeHtml('#back-to-home-btn', t.quit);
+}
+
+const langSelect = document.getElementById('lang-select');
+if (langSelect) {
+  langSelect.addEventListener('change', (e) => {
+    updateLanguage(e.target.value);
+  });
+}
 
 // ── Battle Mode ────────────────────────────────────────────────
 function initBattleMode() {

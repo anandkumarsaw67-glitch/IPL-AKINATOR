@@ -51,6 +51,16 @@ const PLAYERS = [
     isOpener: false, isYoung: false, teamColor: "#1C1C1C"
   },
   {
+    id: "krunal_pandya", name: "Krunal Pandya", emoji: "🌪️",
+    country: "India", role: "All-rounder",
+    battingPosition: "Middle", teams: ["MI", "LSG"],
+    isCaptain: true, isDeathBowler: false, isFinisher: true,
+    isPowerplaySpecialist: true, isAggressive: true, isActive: true,
+    titles: 3, isWicketkeeper: false, isSpin: true, isFast: false,
+    isAllRounder: true, isLeftHanded: true, hasPlayedTest: false,
+    isOpener: false, isYoung: false, teamColor: "#A72056"
+  },
+  {
     id: "kl_rahul", name: "KL Rahul", emoji: "🎯",
     country: "India", role: "Wicketkeeper",
     battingPosition: "Top", teams: ["RCB", "KXIP", "LSG"],
